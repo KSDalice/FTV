@@ -30,6 +30,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         vibrator = (Vibrator) getSystemService(Service.VIBRATOR_SERVICE); //獲取系統的Vibrator服務
+        AudioManager audioManager = (AudioManager)getSystemService(this.AUDIO_SERVICE);
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 20, 0);
     }
 
     @Override
