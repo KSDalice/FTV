@@ -25,4 +25,10 @@ public class ApiData {
     public class ObjectData {
         public boolean isEffective;
     }
+
+    // 3.10 驗證QRcode
+    public UploadObjectData uploadObjectData;
+    public class UploadObjectData {
+        public boolean isSuccess;
+    }
 }

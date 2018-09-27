@@ -1,119 +1,203 @@
 package com.example.alice.ftvargame_verifytickets_app;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
 import android.app.Service;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
+import android.media.SoundPool;
 import android.net.Uri;
+import android.os.Handler;
 import android.os.Vibrator;
+import android.preference.PreferenceManager;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 
+import org.apache.commons.text.RandomStringGenerator;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+
+import static android.media.AudioManager.STREAM_ALARM;
+import static android.media.AudioManager.STREAM_MUSIC;
+
 public class MainActivity extends AppCompatActivity {
 
-    IntentIntegrator scanIntegrator;
-    Vibrator vibrator;
-    static MediaPlayer mMediaPlayer;
+
+    public static boolean offline;
+    Button datePickButton,scan_onlineButton,scan_offlineButton;
+    String dateString;
+    Button downloadButton,uploadButton;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        vibrator = (Vibrator) getSystemService(Service.VIBRATOR_SERVICE); //獲取系統的Vibrator服務
-        AudioManager audioManager = (AudioManager)getSystemService(this.AUDIO_SERVICE);
-        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 20, 0);
+        datePickButton = (Button)findViewById(R.id.datePickButton);
+        scan_onlineButton = (Button)findViewById(R.id.scan_onlineButton);
+        scan_offlineButton = (Button)findViewById(R.id.scan_offlineButton);
+        downloadButton = (Button)findViewById(R.id.downloadButton);
+        uploadButton = (Button)findViewById(R.id.uploadButton);
+        scan_onlineButton.setOnClickListener(getButtonListner());
+        scan_offlineButton.setOnClickListener(getButtonListner());
+        downloadButton.setOnClickListener(getButtonListner());
+        uploadButton.setOnClickListener(getButtonListner());
+        //離線模式開關
+        offline=false;
+
     }
 
-    @Override
+    public void datePicker(View view){
+        Calendar calendar = Calendar.getInstance();
+        int year = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH);
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+        new DatePickerDialog(view.getContext(), new DatePickerDialog.OnDateSetListener() {
+            @Override
+            public void onDateSet(DatePicker datePicker, int year, int month, int day) {
+                dateString = String.format("%02d%02d", month+1, day);
+                Log.e("show Today",dateString);
+                datePickButton.setText((month+1)+"/"+day);
+            }
+        },year,month,day).show();
+    }
+
+        @Override
     protected void onResume() {
         super.onResume();
-        startScan();
     }
-    public void onActivityResult(int requestCode, int resultCode, Intent intent)
-    {
-        IntentResult scanningResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, intent);
-        if (scanningResult != null) {
-            if (scanningResult.getContents() != null) {
-                String scanContent = scanningResult.getContents();
-                if (!scanContent.equals("")) {
-                    verify(scanContent);
+
+    private View.OnClickListener getButtonListner (){
+        return new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(dateString==null){
+                    Toast.makeText(MainActivity.this,"請先選擇核銷日期",Toast.LENGTH_SHORT).show();
+                    return;
                 }
+                if(view == scan_onlineButton){
+                    offline = false;
+                    Intent intent = new Intent(MainActivity.this,ScanActivity.class);
+                    intent.putExtra("sessionCode",dateString);
+                    startActivity(intent);
+                }else if(view == scan_offlineButton){
+                    offline = true;
+                    Intent intent = new Intent(MainActivity.this,ScanActivity.class);
+                    intent.putExtra("sessionCode",dateString);
+                    startActivity(intent);
+                }else if(view == downloadButton){
+                    getAllqrcode(dateString);
+                }else if(view == uploadButton){
+                    upload("287e36c0-ba2e-11e8-ac85-490b347118cc,295c0200-ba2e-11e8-a56b-933dd5b91cd7");
+                }
+
             }
-        } else {
-            super.onActivityResult(requestCode, resultCode, intent);
-            Toast.makeText(MainActivity.this, "掃描失敗，請重新掃描", Toast.LENGTH_LONG).show();
-            startScan();
-        }
-
-    }
-    private void startScan(){
-        scanIntegrator = new IntentIntegrator(MainActivity.this);
-        scanIntegrator.setPrompt("請掃描");
-        scanIntegrator.setTimeout(300000);
-        scanIntegrator.setOrientationLocked(false);
-        scanIntegrator.initiateScan();
+        };
     }
 
-    private void verify(String qrcode){
-        ApiTool.qrcode(this, qrcode, new ApiTool.ApiCallback() {
+    /**下載所有QRCode*/
+    private void getAllqrcode(String sessionCode){
+        ApiTool.getAllqrcode(this,sessionCode, new ApiTool.ApiCallback() {
             @Override
             public void success(ApiData apiData) {
-                if(apiData.objectData.isEffective){
-                    Toast.makeText(MainActivity.this, "核銷成功!", Toast.LENGTH_LONG).show();
-                    if (vibrator.hasVibrator()) {
-                        playRing(MainActivity.this);
-                        vibrator.vibrate(500);
-                        startScan();
-                        stopRing();
+                if(apiData.data!=null){
+                    try {
+                        JSONObject dataObject = new JSONObject(apiData.data);
+                        JSONArray concertsArray = dataObject.getJSONArray("concerts");
+                        ArrayList<String> Concerts = new ArrayList<>();
+                        for(int i = 0;i<concertsArray.length();i++){
+                            JSONObject concertObject = concertsArray.getJSONObject(i);
+                            if(concertObject.getInt("used")==0){
+                                Concerts.add(concertObject.getString("qrcode"));
+                            }
+                        }
+                        saveArrayList(Concerts,"downloadConcerts");
+                        ArrayList<String> getConcerts = getArrayList("downloadConcerts");
+
+                        for (String s:getConcerts) {
+                            Log.e("Concerts",s);
+                        }
+                        Log.e("getConcertsSize",getConcerts.size()+"");
+                    } catch (JSONException e) {
+                        e.printStackTrace();
                     }
-                }else {
-                    Toast.makeText(MainActivity.this, "核銷結果失敗!!!請用戶重新確認。", Toast.LENGTH_LONG).show();
                 }
             }
 
             @Override
             public void error(String error) {
-                Toast.makeText(MainActivity.this,"APIVerifyError，please try again!",Toast.LENGTH_LONG).show();
+                Log.e("APIerror",error);
+                Toast.makeText(getApplicationContext(),"網路不穩，請再重試一次!",Toast.LENGTH_LONG).show();
             }
         });
     }
-    //开始播放
-    public static void playRing(final Activity activity){
-        try {
-            Uri alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);//用于获取手机默认铃声的Uri
-            mMediaPlayer = new MediaPlayer();
-            mMediaPlayer.setDataSource(activity, alert);
-            mMediaPlayer.setAudioStreamType(AudioManager.STREAM_RING);//告诉mediaPlayer播放的是铃声流
-            mMediaPlayer.setLooping(true);
-            mMediaPlayer.prepare();
-            mMediaPlayer.start();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-    //停止播放
-    public static void stopRing(){
-        if (mMediaPlayer!=null){
-            if (mMediaPlayer.isPlaying()){
-                mMediaPlayer.stop();
-                mMediaPlayer.release();
+
+    private void upload(String qrcodes) {
+        ApiTool.upload(this, qrcodes, new ApiTool.ApiCallback() {
+            @Override
+            public void success(ApiData apiData) {
+                if (apiData.code.equals("00")) {
+                    NotStackedToast.showToast(MainActivity.this, "上傳成功，沒有異常紀錄");
+                }
             }
-        }
+
+            @Override
+            public void error(String error) {
+                NotStackedToast.showToast(MainActivity.this, "上傳紀錄錯誤 " + error);
+            }
+        });
     }
 
+    /**
+     *     Save and get ArrayList in SharedPreference
+     */
 
-    //    作者：Ed1SoNJ
-//    链接：https://www.jianshu.com/p/7cf9972b4fc6
-//    來源：简书
-//    简书著作权归作者所有，任何形式的转载都请联系作者获得授权并注明出处。
+    public void saveArrayList(ArrayList<String> list, String key){
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        SharedPreferences.Editor editor = prefs.edit();
+        Gson gson = new Gson();
+        String json = gson.toJson(list);
+        editor.putString(key, json);
+        editor.apply();     // This line is IMPORTANT !!!
+    }
+
+    public ArrayList<String> getArrayList(String key){
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        Gson gson = new Gson();
+        String json = prefs.getString(key, null);
+        Type type = new TypeToken<ArrayList<String>>() {}.getType();
+        return gson.fromJson(json, type);
+    }
 }

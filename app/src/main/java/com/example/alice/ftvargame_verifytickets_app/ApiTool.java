@@ -31,7 +31,17 @@ import retrofit2.http.POST;
  */
 
 public class ApiTool extends ApiData {
-    private static final String ApiURL = "http://104.215.159.93";
+    //切換正式or測試環境
+    private static final boolean Debug = true;
+
+    private static final String ApiURL = getApiURL();
+    protected static String getApiURL(){
+        if (!Debug){
+            return "http://104.215.159.93";//正式
+        }else {
+            return "http://13.76.153.1";//測試
+        }
+    }
     protected static Retrofit retrofit = new Retrofit.Builder().baseUrl(ApiURL).client(setOkHttpClient()).addConverterFactory(GsonConverterFactory.create()).build();
 
     private static ProgressDialog progressDialog;
@@ -133,10 +143,11 @@ public class ApiTool extends ApiData {
         @FormUrlEncoded
         Call<ResponseBody> setValue(@FieldMap Map<String,String> params);
     }
-    public static void qrcode(final Activity activity, String qrcode, final ApiCallback apiCallback){
+    public static void qrcode(final Activity activity,String sessionCode, String qrcode, final ApiCallback apiCallback){
         initProgressDialog(activity);
         Map<String,String> params = new HashMap<String, String>();
         params.put("adminPassword","ksdwithftvar");//後台設定密碼
+        params.put("sessionCode",sessionCode);
         params.put("qrcode",qrcode);
         retrofit.create(qrcode.class).setValue(params).enqueue(new Callback<ResponseBody>() {
             @Override
@@ -166,6 +177,85 @@ public class ApiTool extends ApiData {
                 apiCallback.error(String.valueOf(t));
                 showThrowable(activity,t);
                 Log.e("code","apiOnfail");
+            }
+        });
+    }
+
+    // 3.11. 驗證票券
+    private interface getAllqrcode {
+        @POST("/api/v1/concert/verify/offline")
+        @FormUrlEncoded
+        Call<ResponseBody> setValue(@FieldMap Map<String,String> params);
+    }
+    public static void getAllqrcode(final Activity activity,String sessionCode, final ApiCallback apiCallback){
+        initProgressDialog(activity);
+        Map<String,String> params = new HashMap<String, String>();
+        params.put("adminPassword","ksdwithftvar");//後台設定密碼
+        params.put("sessionCode",sessionCode);
+        retrofit.create(ApiTool.getAllqrcode.class).setValue(params).enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                try {
+                    ApiData apiData = getApiData(activity,response, apiCallback);
+                    Log.e("code",apiData.code);
+                    if (apiData.code.equals("00")) {
+                        Log.e("onResponse","codeEquals00");
+//                        Type type = new TypeToken<ApiData.ObjectData>() {
+//                        }.getType();
+//                        apiData.objectData = gson.fromJson(apiData.data,ObjectData.class);
+//                        Log.e("isEffective=",String.valueOf(apiData.objectData.isEffective));
+                        apiCallback.success(apiData);
+                    }else {
+                        dismissProgressDialog();
+                        return;
+                    }
+                } catch (Exception e) {
+                    Log.e("API_3.11_e",e.toString());
+                    apiCallback.error(String.valueOf(e));
+                }
+                dismissProgressDialog();
+            }
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                apiCallback.error(String.valueOf(t));
+                showThrowable(activity,t);
+                Log.e("code","apiOnfail");
+            }
+        });
+    }
+
+    // 3.12 離線票券驗證更新
+    private interface upload {
+        @POST("/api/v1/concert/verify/update")
+        @FormUrlEncoded
+        Call<ResponseBody> setValue(@FieldMap Map<String,String> params);
+    }
+    public static void upload(final Activity activity, String qrcode, final ApiCallback apiCallback){
+        initProgressDialog(activity);
+        Map<String,String> params = new HashMap<String, String>();
+        params.put("adminPassword","ksdwithftvar");//後台設定密碼
+        params.put("qrcodes",qrcode);
+
+        retrofit.create(upload.class).setValue(params).enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                try {
+                    ApiData apiData = getApiData(activity,response, apiCallback);
+                    if (apiData.code.equals("00")){
+                        apiData.uploadObjectData = gson.fromJson(apiData.data,UploadObjectData.class);
+                        Log.e("isSuccess=",String.valueOf(apiData.uploadObjectData.isSuccess));
+                        apiCallback.success(apiData);
+                    }
+                } catch (Exception e) {
+                    Log.e("API_3.12_e",e.toString());
+                    apiCallback.error(String.valueOf(e));
+                }
+                dismissProgressDialog();
+            }
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                apiCallback.error(String.valueOf(t));
+                showThrowable(activity,t);
             }
         });
     }
