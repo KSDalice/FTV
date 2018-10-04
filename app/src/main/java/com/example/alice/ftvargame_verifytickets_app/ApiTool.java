@@ -32,7 +32,7 @@ import retrofit2.http.POST;
 
 public class ApiTool extends ApiData {
     //切換正式or測試環境
-    private static final boolean Debug = true;
+    public static final boolean Debug = false;
 
     private static final String ApiURL = getApiURL();
     protected static String getApiURL(){
@@ -231,7 +231,7 @@ public class ApiTool extends ApiData {
         Call<ResponseBody> setValue(@FieldMap Map<String,String> params);
     }
     public static void upload(final Activity activity, String qrcode, final ApiCallback apiCallback){
-        initProgressDialog(activity);
+//        initProgressDialog(activity);
         Map<String,String> params = new HashMap<String, String>();
         params.put("adminPassword","ksdwithftvar");//後台設定密碼
         params.put("qrcodes",qrcode);
@@ -250,7 +250,7 @@ public class ApiTool extends ApiData {
                     Log.e("API_3.12_e",e.toString());
                     apiCallback.error(String.valueOf(e));
                 }
-                dismissProgressDialog();
+//                dismissProgressDialog();
             }
             @Override
             public void onFailure(Call<ResponseBody> call, Throwable t) {

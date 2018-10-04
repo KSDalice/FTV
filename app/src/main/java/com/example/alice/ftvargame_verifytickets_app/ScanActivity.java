@@ -2,7 +2,9 @@ package com.example.alice.ftvargame_verifytickets_app;
 
 import android.app.Activity;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
@@ -33,6 +35,7 @@ import java.io.UnsupportedEncodingException;
 import java.sql.Time;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Map;
 
 import static android.media.AudioManager.STREAM_MUSIC;
 
@@ -45,7 +48,8 @@ public class ScanActivity extends AppCompatActivity {
     int sound;
     int streamID;
     String sessionCode;
-
+    SharedPreferences sharedPreferences;
+    String scanMode ;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -55,6 +59,7 @@ public class ScanActivity extends AppCompatActivity {
         soundPool = new SoundPool(5,STREAM_MUSIC,0);
         sound = soundPool.load(this,R.raw.beep2,1);
         vibrator = (Vibrator) getSystemService(Service.VIBRATOR_SERVICE); //獲取系統的Vibrator服務
+        sharedPreferences  = getApplication().getSharedPreferences(sessionCode+MainActivity.KEY, Context.MODE_PRIVATE);
 
 
         //控制系統音量
@@ -62,13 +67,7 @@ public class ScanActivity extends AppCompatActivity {
 //        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 20, 0);
     }
 
-    private void getSessionCode() {
-        Calendar mCal = Calendar.getInstance();
-        String dateformat = "MMdd";
-        SimpleDateFormat df = new SimpleDateFormat(dateformat);
-        String today = df.format(mCal.getTime());
-        Log.d("getSeesionCode", "today is " + today);
-    }
+
 
     @Override
     protected void onResume() {
@@ -83,30 +82,33 @@ public class ScanActivity extends AppCompatActivity {
                 String scanContent = scanningResult.getContents();
                 if (!scanContent.equals("")) {
                     if(!MainActivity.offline){
+                        Log.e("onlineScan","onlineScan");
                         verify(sessionCode,scanContent);
-                    }else {
-                        ReadJason(scanContent);
+                    }else {//離線掃描
+                        Log.e("offlineScan","offlineScan");
+                       verify(scanContent);
                     }
 
                 }
             }
         } else {
             super.onActivityResult(requestCode, resultCode, intent);
-            Toast.makeText(ScanActivity.this, "掃描失敗，請重新掃描", Toast.LENGTH_LONG).show();
+//            Toast.makeText(ScanActivity.this, "掃描失敗，請重新掃描", Toast.LENGTH_LONG).show();
+            NotStackedToast.showToast(ScanActivity.this, "掃描失敗，請重新掃描");
         }
 
     }
 
 
-    String scanMode = "";
+
     private void startScan(){
-//        scanIntegrator = new IntentIntegrator(ScanActivity.this);
-//        scanIntegrator =IntentIntegrator.forSupportFragment();
         if(!MainActivity.offline){
             scanMode = "網路連線掃描";
         }else {
             scanMode = "離線模式";
         }
+        scanIntegrator = new IntentIntegrator(ScanActivity.this);
+//        scanIntegrator =IntentIntegrator.forSupportFragment();//zxing with fragment
         scanIntegrator.setPrompt(scanMode);
         scanIntegrator.setTimeout(300000);
         scanIntegrator.setBeepEnabled(false);
@@ -114,14 +116,18 @@ public class ScanActivity extends AppCompatActivity {
         scanIntegrator.initiateScan();
     }
 
+    //線上驗票
     private void verify(String sessionCode,String qrcode){
         ApiTool.qrcode(this,sessionCode, qrcode, new ApiTool.ApiCallback() {
             @Override
             public void success(ApiData apiData) {
+                Log.e("verifyResult:","isEffective="+apiData.objectData.isEffective+"");
                 if(apiData.objectData.isEffective){
-                    SuccessAction();
+                    Log.e("verifyMessage:","message="+apiData.objectData.message+"");
+                    SuccessAction(apiData.objectData.message);
                 }else {
-                    FailureAction();
+                    Log.e("verifyMessage:","message="+apiData.objectData.message+"");
+                    FailureAction(apiData.objectData.message);
 
                 }
             }
@@ -129,9 +135,37 @@ public class ScanActivity extends AppCompatActivity {
             @Override
             public void error(String error) {
                 Log.e("APIerror",error);
-                Toast.makeText(getApplicationContext(),"網路不穩，請再重試一次!",Toast.LENGTH_LONG).show();
+//                Toast.makeText(getApplicationContext(),"網路不穩，請再重試一次!",Toast.LENGTH_LONG).show();
+                NotStackedToast.showToast(ScanActivity.this, "網路不穩，請再重試一次!");
             }
         });
+    }
+
+    //離線驗票
+    private void verify(String qrcode){
+
+        Map<String, ?> prefsMap = sharedPreferences.getAll();
+        String uploadString = "";
+        int used =sharedPreferences.getInt(qrcode,-1) ;
+        switch (used){
+            case 0://qrcode未使用
+                sharedPreferences.edit().putInt(qrcode,1).apply();
+                SuccessAction("驗證成功");
+                break;
+            case 1://qrcode已使用
+                FailureAction("票券已使用");//核銷結果失敗
+                break;
+            case -1://qrcode不存在離線資料裡
+                FailureAction("無效票券");
+                break;
+        }
+
+        for (Map.Entry<String, ?> entry: prefsMap.entrySet()) {
+            Log.v("uploadSharedPreferences", entry.getKey() + ":" + entry.getValue().toString());//查看sharedPreference所有資料
+            if(entry.getValue().toString().equals("1")){
+                uploadString += (entry.getKey()+",");
+            }
+        }
     }
 
     //隨機產生字串方法
@@ -161,10 +195,10 @@ public class ScanActivity extends AppCompatActivity {
             for(int i=0;i<jsonArray.length(); i++){
                 if(scanContent.equals(jsonArray.getString(i)))
                 {
-                    SuccessAction();
+                    SuccessAction("驗證成功");
                     return;
                 }else {
-                    FailureAction();
+                    FailureAction("核銷結果失敗!!!請用戶重新確認。");
                 }
             }
         } catch (UnsupportedEncodingException e) {
@@ -177,13 +211,14 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     //掃描成功回傳成功後執行
-    private void SuccessAction() {
+    private void SuccessAction(String message) {
         try {
             if(mtoast!=null){
                 mtoast.cancel();
             }
             streamID = soundPool.play(sound,1,1,1,0,1);
-            Toast.makeText(getApplicationContext(), "核銷成功!", Toast.LENGTH_SHORT).show();
+//            Toast.makeText(getApplicationContext(), "核銷成功!", Toast.LENGTH_SHORT).show();
+            NotStackedToast.showToast(ScanActivity.this, message);
             if (vibrator.hasVibrator()) {
                 vibrator.vibrate(500);
             }
@@ -201,7 +236,7 @@ public class ScanActivity extends AppCompatActivity {
     }
     Toast mtoast;
     //掃描成功回傳失敗後執行
-    private void FailureAction() {
+    private void FailureAction(String showText) {
         if(mtoast==null){
             mtoast = new Toast(getApplicationContext());
         }
@@ -210,7 +245,7 @@ public class ScanActivity extends AppCompatActivity {
         mtoast.setGravity(Gravity.CENTER, 0, 0);
         mtoast.setView(custToast);
         TextView toastTextView = (TextView) mtoast.getView().findViewById(R.id.toastTextView);
-        toastTextView.setText("核銷結果失敗!!!請用戶重新確認。");
+        toastTextView.setText(showText);
         mtoast.show();
 
 
@@ -251,6 +286,14 @@ public class ScanActivity extends AppCompatActivity {
         }
     }
 
+    //取得系統時間轉SessionCode
+    private void getSessionCode() {
+        Calendar mCal = Calendar.getInstance();
+        String dateformat = "MMdd";
+        SimpleDateFormat df = new SimpleDateFormat(dateformat);
+        String today = df.format(mCal.getTime());
+        Log.d("getSeesionCode", "today is " + today);
+    }
     @Override
     public void onBackPressed() {
         super.onBackPressed();

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">FTVARGame-verifytickets-app</string>
+    <string name="app_name">電玩音樂趴核銷</string>
     <string name="verify_title">核銷結果</string>
     <string name="verify_content_success">核銷確認成功</string>
     <string name="verify_content_fail">核銷結果為失效，請用戶重新確認</string>

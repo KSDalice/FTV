@@ -24,6 +24,7 @@ public class ApiData {
     public ObjectData objectData;
     public class ObjectData {
         public boolean isEffective;
+        public String message;
     }
 
     // 3.10 驗證QRcode

@@ -8,11 +8,16 @@
     android:gravity="center"
     android:orientation="vertical"
     tools:context="com.example.alice.ftvargame_verifytickets_app.MainActivity">
-
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/showDebug_TextView"
+        android:visibility="gone"
+        android:text="測試環境"/>
     <Button
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/datePickButton"
+        android:id="@+id/datePick_Button"
         android:onClick="datePicker"
         android:text="選擇核銷日期"/>
     <LinearLayout
@@ -20,14 +25,14 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
         <Button
-            android:id="@+id/scan_onlineButton"
+            android:id="@+id/scan_online_Button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="50dp"
             android:layout_weight="1"
             android:text="自動掃描" />
         <Button
-            android:id="@+id/scan_offlineButton"
+            android:id="@+id/scan_offline_Button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="50dp"
@@ -35,16 +40,16 @@
             android:text="離線掃描" />
 
     </LinearLayout>
+    <!--<Button-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:id="@+id/download_Button"-->
+        <!--android:layout_marginTop="50dp"-->
+        <!--android:text="下載資料"/>-->
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/downloadButton"
+        android:id="@+id/update_Button"
         android:layout_marginTop="50dp"
-        android:text="下載資料"/>
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/uploadButton"
-        android:layout_marginTop="50dp"
-        android:text="上傳資料"/>
+        android:text="資料更新"/>
 </LinearLayout>
