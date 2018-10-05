@@ -240,13 +240,19 @@ public class ScanActivity extends AppCompatActivity {
         if(mtoast==null){
             mtoast = new Toast(getApplicationContext());
         }
-        LayoutInflater layoutInflater = getLayoutInflater();
-        View custToast = layoutInflater.inflate(R.layout.toast_layout, null);
-        mtoast.setGravity(Gravity.CENTER, 0, 0);
-        mtoast.setView(custToast);
-        TextView toastTextView = (TextView) mtoast.getView().findViewById(R.id.toastTextView);
-        toastTextView.setText(showText);
-        mtoast.show();
+        try {
+            LayoutInflater layoutInflater = getLayoutInflater();
+            View custToast = layoutInflater.inflate(R.layout.toast_layout, null);
+            mtoast.setGravity(Gravity.CENTER, 0, 0);
+            mtoast.setView(custToast);
+            TextView toastTextView = (TextView) mtoast.getView().findViewById(R.id.toastTextView);
+            toastTextView.setText(showText);
+            mtoast.show();
+        }
+       catch (Exception e){
+           NotStackedToast.showToast(ScanActivity.this,"無效票卷!");
+            Log.e("Exception",e.toString());
+       }
 
 
 //        Toast.makeText(MainActivity.this, "核銷結果失敗!!!請用戶重新確認。", Toast.LENGTH_LONG).show();
